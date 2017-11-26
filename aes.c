@@ -21,7 +21,7 @@
 
 #include "aes.h"
 
-inline uint8_t aes_galois_mul2(uint8_t input) {
+uint8_t aes_galois_mul2(uint8_t input) {
   // Left shift the input by 1 bit, then XOR it with 0x1B if the MSB was 1
   return (input << 1) ^ (0x1B & (uint8_t)((signed char)input >> 7));
 }

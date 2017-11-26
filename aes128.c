@@ -54,26 +54,26 @@ extern void aes128_key_init(aes128_key_t* key) {
     aes128_key_advance(key->val + (i << 4), key->val + (j << 4), j);
 }
 
-inline void aes128_add_round_key(const aes128_state_t* in, aes128_state_t* out,
+void aes128_add_round_key(const aes128_state_t* in, aes128_state_t* out,
     const aes128_key_t* key, const uint8_t round_num) {
   // XOR each state byte with the corresponding key byte
   for (uint8_t i = 0; i < 16; ++i)
     out->val[i] = in->val[i] ^ key->val[(round_num << 4) + i];
 }
 
-inline void aes128_sbox_repl(const aes128_state_t* in, aes128_state_t* out) {
+void aes128_sbox_repl(const aes128_state_t* in, aes128_state_t* out) {
   // Iterate over each byte of the input and replace it with its S-box value
   for (uint8_t i = 0; i < 16; ++i)
     out->val[i] = aes_sbox[in->val[i]];
 }
 
-inline void aes128_shift_cols(const aes128_state_t* in, aes128_state_t* out) {
+void aes128_shift_cols(const aes128_state_t* in, aes128_state_t* out) {
   // Circular shift each column using its index as the shift amount
   for (uint8_t i = 0; i < 4; ++i)
     aes128_shift_col(in, out, i, i);
 }
 
-inline void aes128_shift_col(const aes128_state_t* in, aes128_state_t* out,
+void aes128_shift_col(const aes128_state_t* in, aes128_state_t* out,
     const uint8_t column, uint8_t amount) {
   amount %= 4;
   // Store the original values held in this column
@@ -90,13 +90,13 @@ inline void aes128_shift_col(const aes128_state_t* in, aes128_state_t* out,
   out->val[column + 12] = temp[3];
 }
 
-inline void aes128_mix_rows(const aes128_state_t* in, aes128_state_t* out) {
+void aes128_mix_rows(const aes128_state_t* in, aes128_state_t* out) {
   // Iterate through each row in the table to mix it
   for (uint8_t i = 0; i < 4; ++i)
     aes128_mix_row(in->val + (i << 2), out->val + (i << 2));
 }
 
-inline void aes128_mix_row(const uint8_t* in, uint8_t* out) {
+void aes128_mix_row(const uint8_t* in, uint8_t* out) {
   // Store the original values held in this row
   uint8_t temp[4] = {
     in[0], in[1], in[2], in[3]
@@ -111,7 +111,7 @@ inline void aes128_mix_row(const uint8_t* in, uint8_t* out) {
   out[3] = temp[0] ^ mul2[0] ^ temp[1] ^ temp[2] ^ mul2[3];
 }
 
-inline void aes128_key_advance(const uint8_t* in, uint8_t* out,
+void aes128_key_advance(const uint8_t* in, uint8_t* out,
     const uint8_t round_num) {
   // Create a pointer to the last row of the input key
   const uint8_t _in[4] = { 13, 14, 15, 12 };

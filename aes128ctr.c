@@ -37,7 +37,7 @@
 void aes128ctr_get_key(const aes128_nonce_t* nonce, const aes128_key_t* key,
   uint64_t counter, aes128_state_t* state);
 
-inline void aes128ctr_get_key(const aes128_nonce_t* nonce,
+void aes128ctr_get_key(const aes128_nonce_t* nonce,
     const aes128_key_t* key, uint64_t counter, aes128_state_t* state) {
   // Convert the counter to big-endian byte order
   counter = htonll(counter);
@@ -84,11 +84,11 @@ extern int aes128ctr_crypt_block_fd(const aes128_nonce_t* nonce,
 }
 
 extern int aes128ctr_crypt_fd(const aes128_nonce_t* nonce,
-    const aes128_key_t* key, const int fd, struct timespec* elapsed) {
+    const aes128_key_t* key, const int fd) {
   // Fetch the file size of the provided file descriptor
   const uint64_t size = lseek64(fd, 0, SEEK_END); lseek64(fd, 0, SEEK_SET);
   // Iterate over each block of the file and crypt it
-  for (uint64_t block = 0; block < (size >> 4) + ((size & 16) > 0); ++block) {
+  for (uint64_t block = 0; block < ((size >> 4) + ((size & 15) > 0)); ++block) {
     // Check that the block was crypted successfully
     if (aes128ctr_crypt_block_fd(nonce, key, fd, block) != 0)
       return 1;

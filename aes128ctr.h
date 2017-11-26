@@ -30,6 +30,6 @@ extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
 extern int aes128ctr_crypt_block_fd(const aes128_nonce_t* nonce,
   const aes128_key_t* key, const int fd, const uint64_t counter);
 extern int aes128ctr_crypt_fd(const aes128_nonce_t* nonce,
-  const aes128_key_t* key, const int fd, struct timespec* elapsed);
+  const aes128_key_t* key, const int fd);
 
 #endif

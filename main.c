@@ -38,11 +38,12 @@
 #define open64  open
 #endif
 
-int                fd = -1 ;
-uint64_t         size =  0 ;
-aes128_nonce_t  nonce = {0};
-aes128_key_t      key = {0};
+int                fd =  -1 ;
+uint64_t         size =   0 ;
+aes128_nonce_t  nonce = {{0}};
+aes128_key_t      key = {{0}};
 
+void timespec_diff(const struct timespec* start, struct timespec* end);
 void usage(int argc, char* argv[]);
 
 int main(int argc, char* argv[]) {
@@ -87,15 +88,18 @@ int main(int argc, char* argv[]) {
               return 3;
             } else {
               // Create some state to store the status and duration of the ops
-              int status = 0; struct timespec ts = {0, 0};
+              int status = 0; struct timespec start = {0, 0}, end = {0, 0};
               // Attempt to initialize the key and crypt the file
               aes128_key_init(&key);
-              status = aes128ctr_crypt_fd(&nonce, &key, fd, &ts);
+              clock_gettime(CLOCK_MONOTONIC, &start);
+              status = aes128ctr_crypt_fd(&nonce, &key, fd);
+              clock_gettime(CLOCK_MONOTONIC, &end);
+              timespec_diff(&start, &end);
               close(fd);
               // Check the status of the cryption operation
               if (status == 0) {
-                fprintf(stderr, "success: Crypted %llu bytes in "
-                                "%ld.%.9ld sec\n", size, ts.tv_sec, ts.tv_nsec);
+                fprintf(stderr, "success: Crypted %llu B in %ld.%.9ld sec\n",
+                  size, end.tv_sec, end.tv_nsec);
                 return 0;
               } else {
                 fprintf(stderr, "error: Cryption failed: %d\n", status);
@@ -110,6 +114,16 @@ int main(int argc, char* argv[]) {
     usage(argc, argv);
   }
   return 127;
+}
+
+void timespec_diff(const struct timespec* start, struct timespec* end) {
+  if ((end->tv_nsec - start->tv_nsec) < 0) {
+    end->tv_sec  -= start->tv_sec  - 1;
+    end->tv_nsec -= start->tv_nsec - 1000000000;
+  } else {
+    end->tv_sec  -= start->tv_sec;
+    end->tv_nsec -= start->tv_nsec;
+  }
 }
 
 void usage(int argc, char* argv[]) {
