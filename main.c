@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
               close(fd);
               // Check the status of the cryption operation
               if (status == 0) {
-                fprintf(stderr, "success: Crypted %llu B in %ld.%.9ld sec\n",
+                fprintf(stderr, "success: Crypted %llu B in %ld.%.6ld sec\n",
                   size, end.tv_sec, end.tv_nsec);
                 return 0;
               } else {
