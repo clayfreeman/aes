@@ -18,6 +18,7 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 
 #include "aes.h"
 #include "aes128.h"
@@ -48,6 +49,8 @@ extern void aes128_encrypt(const aes128_key_t* key, aes128_state_t* state) {
 }
 
 extern void aes128_key_init(aes128_key_t* key) {
+  // Zero all key slots after the first
+  memset(key->val + (1 << 4), 0, sizeof(key->val) - (1 << 4));
   // Calculate the full key schedule from the original key
   for (uint8_t i = 0, j = 1; i < 10; ++i, ++j)
     // Use the previous round's key to incrementally advance the key
@@ -100,27 +103,23 @@ void aes128_mix_row(const uint8_t* in, uint8_t* out) {
   // Store the original values held in this row
   uint8_t temp[4] = {
     in[0], in[1], in[2], in[3]
-  }; // Multiply each original entry by 2 mod (x^4 + 1) in GF(2^8)
-  uint8_t mul2[4] = {
-    aes_galois_mul2(temp[0]), aes_galois_mul2(temp[1]),
-    aes_galois_mul2(temp[2]), aes_galois_mul2(temp[3])
   }; // Calculate the mixed column using the pre-calculated values
-  out[0] = temp[1] ^ mul2[0] ^ mul2[1] ^ temp[2] ^ temp[3];
-  out[1] = temp[2] ^ temp[0] ^ mul2[1] ^ mul2[2] ^ temp[3];
-  out[2] = temp[3] ^ temp[0] ^ temp[1] ^ mul2[2] ^ mul2[3];
-  out[3] = temp[0] ^ mul2[0] ^ temp[1] ^ temp[2] ^ mul2[3];
+  out[0] = aes_gal2[temp[0]] ^ aes_gal3[temp[1]] ^ temp[2] ^ temp[3];
+  out[1] = temp[0] ^ aes_gal2[temp[1]] ^ aes_gal3[temp[2]] ^ temp[3];
+  out[2] = temp[0] ^ temp[1] ^ aes_gal2[temp[2]] ^ aes_gal3[temp[3]];
+  out[3] = aes_gal3[temp[0]] ^ temp[1] ^ temp[2] ^ aes_gal2[temp[3]];
 }
 
 void aes128_key_advance(const uint8_t* in, uint8_t* out,
     const uint8_t round_num) {
   // Create a pointer to the last row of the input key
   const uint8_t _in[4] = { 13, 14, 15, 12 };
-  // The first output byte is the input byte XOR-ed with this round's constant
-  out[0] = in[0] ^ aes_rcon[round_num];
+  // Assign the round constant to the first byte
+  out[0] = aes_rcon[round_num];
   // Iterate over and copy each input byte to the output byte
-  for (uint8_t i = 0; i < 16; ++i, out[i] = in[i]) {
+  for (uint8_t i = 0; i < 16; ++i) {
     // XOR this output byte with ...
-    out[i] ^= (i < 4 ?
+    out[i] ^= in[i] ^ (i < 4 ?
       // ... the forward S-box substitution of in[13, 14, 15, 12] ...
       aes_sbox[in[_in[i]]] :
       // ... or the previous word's matching byte of output

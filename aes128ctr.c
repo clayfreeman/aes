@@ -58,28 +58,28 @@ extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
 }
 
 extern size_t aes128ctr_crypt_block_file(const aes128_nonce_t* nonce,
-    const aes128_key_t* key, FILE* fp, const uint64_t counter) {
+    const aes128_key_t* key, FILE* ifp, FILE* ofp, const uint64_t counter) {
   aes128_state_t state;
   // Reliably read a block from the file into the state structure
-  fpos_t start_pos; fgetpos(fp, &start_pos);
-  size_t bytes_read = fread(state.val, 1, sizeof(state.val), fp);
-  fsetpos(fp, &start_pos);
+  size_t bytes_read = fread(state.val, 1, sizeof(state.val), ifp);
   // Crypt this block from the file
   aes128ctr_crypt(nonce, key, &state, counter);
   // Reliably write a block to the file from the state structure
-  return fwrite(state.val, 1, bytes_read, fp);
+  return fwrite(state.val, 1, bytes_read, ofp);
 }
 
-extern fpos_t aes128ctr_crypt_file(const aes128_nonce_t* nonce,
-    const aes128_key_t* key, FILE* fp) {
+extern fpos_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
+    const aes128_key_t* key, const char* path) {
+  // Open two files; one for read, one for write
+  FILE* ifp = fopen(path, "rb"); FILE* ofp = fopen(path, "r+b");
   // Set the buffer size for the file to increase throughput
-  setvbuf(fp, NULL, _IOFBF, 1 << 12);
-  // Fetch the file size of the provided file descriptor
-  fseek(fp, 0, SEEK_END); fpos_t size; fgetpos(fp, &size); rewind(fp);
-  // Calculate the number of blocks in this file
-  uint64_t total_blocks = ((size >> 4) + ((size & 0x0F) > 0));
+  setvbuf(ifp, NULL, _IOFBF, 1 << 12);
+  setvbuf(ofp, NULL, _IOFBF, 1 << 12);
   // Iterate over each chunk to encrypt its blocks
-  for (uint64_t counter = 0; counter < total_blocks; ++counter)
-    if (aes128ctr_crypt_block_file(nonce, key, fp, counter) != (1 << 4)) break;
-  fgetpos(fp, &size); return size;
+  for (uint64_t counter = 0, result = 16; result == 16; ++counter)
+    result = aes128ctr_crypt_block_file(nonce, key, ifp, ofp, counter);
+  // Return the current position of the output stream
+  fpos_t size; fgetpos(ofp, &size);
+  fclose(ifp); fclose(ofp);
+  return size;
 }

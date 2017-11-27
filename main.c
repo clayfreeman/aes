@@ -33,7 +33,6 @@
 #include "aes128.h"
 #include "aes128ctr.h"
 
-FILE*           fp;
 fpos_t          size;
 aes128_nonce_t  nonce;
 aes128_key_t    key;
@@ -42,6 +41,7 @@ void timespec_diff(const struct timespec* start, struct timespec* end);
 void usage(int argc, char* argv[]);
 
 int main(int argc, char* argv[]) {
+  FILE* fp = NULL;
   // Ensure that the minimum of three arguments was provided
   if (argc > 3) {
     errno = 0;
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
       return 1;
     } else {
       // Determine the size of the file
-      fseek(fp, 0, SEEK_END); fgetpos(fp, &size); rewind(fp);
+      fseek(fp, 0, SEEK_END); fgetpos(fp, &size); fclose(fp); fp = NULL;
       // Ensure that the provided NONCE argument is the correct length
       if (strlen(argv[2]) != 16) {
         fprintf(stderr, "error: nonce must be 16 hexadecimal characters\n");
@@ -87,13 +87,12 @@ int main(int argc, char* argv[]) {
               // Attempt to initialize the key and crypt the file
               aes128_key_init(&key);
               clock_gettime(CLOCK_MONOTONIC, &start);
-              status = aes128ctr_crypt_file(&nonce, &key, fp);
+              status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
               clock_gettime(CLOCK_MONOTONIC, &end);
               timespec_diff(&start, &end);
-              fclose(fp);
               // Check the status of the cryption operation
               if (status == size) {
-                fprintf(stderr, "success: Crypted %llu B in %ld.%.6ld sec\n",
+                fprintf(stderr, "success: Crypted %llu B in %ld.%.9ld sec\n",
                   status, end.tv_sec, end.tv_nsec);
                 return 0;
               } else {
