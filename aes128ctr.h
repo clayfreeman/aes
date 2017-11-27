@@ -27,9 +27,9 @@
 
 extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
   const aes128_key_t* key, aes128_state_t* state, uint64_t counter);
-extern int aes128ctr_crypt_block_fd(const aes128_nonce_t* nonce,
-  const aes128_key_t* key, const int fd, const uint64_t counter);
-extern int aes128ctr_crypt_fd(const aes128_nonce_t* nonce,
-  const aes128_key_t* key, const int fd);
+extern size_t aes128ctr_crypt_block_file(const aes128_nonce_t* nonce,
+  const aes128_key_t* key, FILE* fp, const uint64_t counter);
+extern fpos_t aes128ctr_crypt_file(const aes128_nonce_t* nonce,
+  const aes128_key_t* key, FILE* fp);
 
 #endif

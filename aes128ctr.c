@@ -18,8 +18,7 @@
  */
 
 #include <stdio.h>
-
-#include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
@@ -58,39 +57,29 @@ extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
     state->val[i] ^= key_stream.val[i];
 }
 
-extern int aes128ctr_crypt_block_fd(const aes128_nonce_t* nonce,
-    const aes128_key_t* key, const int fd, const uint64_t counter) {
+extern size_t aes128ctr_crypt_block_file(const aes128_nonce_t* nonce,
+    const aes128_key_t* key, FILE* fp, const uint64_t counter) {
   aes128_state_t state;
   // Reliably read a block from the file into the state structure
-  int n = 0; // Keep track of the number of bytes that were read
-  for (int ret = 1; ret > 0 && n < 16; n += ret) {
-    // Attempt to read up to 16 bytes from the file
-    ret = read(fd, state.val + n, 16 - n);
-    // Check for a fatal error while reading the file
-    if (ret < 0 && errno != EINTR && errno != EAGAIN)
-      { perror("read()"); return 1; }
-  } // Crypt this block from the file
+  fpos_t start_pos; fgetpos(fp, &start_pos);
+  size_t bytes_read = fread(state.val, 1, sizeof(state.val), fp);
+  fsetpos(fp, &start_pos);
+  // Crypt this block from the file
   aes128ctr_crypt(nonce, key, &state, counter);
-  // Seek to the start of the block
-  lseek64(fd, -n, SEEK_CUR);
   // Reliably write a block to the file from the state structure
-  for (int l = 0, ret = 0; l < n; l += ret) {
-    // Attempt to write up to 16 bytes to the file
-    ret = write(fd, state.val + l, n - l);
-    // Check for a fatal error while writing to the file
-    if (ret < 0 && errno != EINTR && errno != EAGAIN)
-      { perror("write()"); return 1; }
-  } return 0;
+  return fwrite(state.val, 1, bytes_read, fp);
 }
 
-extern int aes128ctr_crypt_fd(const aes128_nonce_t* nonce,
-    const aes128_key_t* key, const int fd) {
+extern fpos_t aes128ctr_crypt_file(const aes128_nonce_t* nonce,
+    const aes128_key_t* key, FILE* fp) {
+  // Set the buffer size for the file to increase throughput
+  setvbuf(fp, NULL, _IOFBF, 1 << 12);
   // Fetch the file size of the provided file descriptor
-  const uint64_t size = lseek64(fd, 0, SEEK_END); lseek64(fd, 0, SEEK_SET);
-  // Iterate over each block of the file and crypt it
-  for (uint64_t block = 0; block < ((size >> 4) + ((size & 15) > 0)); ++block) {
-    // Check that the block was crypted successfully
-    if (aes128ctr_crypt_block_fd(nonce, key, fd, block) != 0)
-      return 1;
-  } return 0;
+  fseek(fp, 0, SEEK_END); fpos_t size; fgetpos(fp, &size); rewind(fp);
+  // Calculate the number of blocks in this file
+  uint64_t total_blocks = ((size >> 4) + ((size & 0x0F) > 0));
+  // Iterate over each chunk to encrypt its blocks
+  for (uint64_t counter = 0; counter < total_blocks; ++counter)
+    if (aes128ctr_crypt_block_file(nonce, key, fp, counter) != (1 << 4)) break;
+  fgetpos(fp, &size); return size;
 }

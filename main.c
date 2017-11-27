@@ -33,15 +33,10 @@
 #include "aes128.h"
 #include "aes128ctr.h"
 
-#ifdef __APPLE__
-#define lseek64 lseek
-#define open64  open
-#endif
-
-int                fd =  -1 ;
-uint64_t         size =   0 ;
-aes128_nonce_t  nonce = {{0}};
-aes128_key_t      key = {{0}};
+FILE*           fp;
+fpos_t          size;
+aes128_nonce_t  nonce;
+aes128_key_t    key;
 
 void timespec_diff(const struct timespec* start, struct timespec* end);
 void usage(int argc, char* argv[]);
@@ -51,13 +46,13 @@ int main(int argc, char* argv[]) {
   if (argc > 3) {
     errno = 0;
     // Attempt to open the file at the path held by the first argument
-    if ((fd = open64(argv[1], O_RDWR)) == -1) {
-      perror("file: open()");
+    if ((fp = fopen(argv[1], "r+b")) == NULL) {
+      perror("file: fopen()");
       usage(argc, argv);
       return 1;
     } else {
       // Determine the size of the file
-      size = lseek64(fd, 0, SEEK_END); lseek(fd, 0, SEEK_SET);
+      fseek(fp, 0, SEEK_END); fgetpos(fp, &size); rewind(fp);
       // Ensure that the provided NONCE argument is the correct length
       if (strlen(argv[2]) != 16) {
         fprintf(stderr, "error: nonce must be 16 hexadecimal characters\n");
@@ -88,21 +83,21 @@ int main(int argc, char* argv[]) {
               return 3;
             } else {
               // Create some state to store the status and duration of the ops
-              int status = 0; struct timespec start = {0, 0}, end = {0, 0};
+              fpos_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
               // Attempt to initialize the key and crypt the file
               aes128_key_init(&key);
               clock_gettime(CLOCK_MONOTONIC, &start);
-              status = aes128ctr_crypt_fd(&nonce, &key, fd);
+              status = aes128ctr_crypt_file(&nonce, &key, fp);
               clock_gettime(CLOCK_MONOTONIC, &end);
               timespec_diff(&start, &end);
-              close(fd);
+              fclose(fp);
               // Check the status of the cryption operation
-              if (status == 0) {
+              if (status == size) {
                 fprintf(stderr, "success: Crypted %llu B in %ld.%.6ld sec\n",
-                  size, end.tv_sec, end.tv_nsec);
+                  status, end.tv_sec, end.tv_nsec);
                 return 0;
               } else {
-                fprintf(stderr, "error: Cryption failed: %d\n", status);
+                fprintf(stderr, "error: Cryption failed\n");
               }
             }
           }
