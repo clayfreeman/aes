@@ -100,9 +100,10 @@ int main(int argc, char* argv[]) {
   aes128_key_init(&key);
   clock_gettime(CLOCK_MONOTONIC, &start);
   // status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
-  status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 8);
+  status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 16);
   clock_gettime(CLOCK_MONOTONIC, &end);
   timespec_diff(&start, &end);
+  double duration = ((double)end.tv_sec + (end.tv_nsec / 1000000000.0));
   // Zero-initialize the nonce and key for security
   memset(nonce.val, 0, sizeof(nonce.val));
   memset(  key.val, 0, sizeof(  key.val));
@@ -111,8 +112,9 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "error: Cryption failed\n");
     return 127;
   }
-  fprintf(stderr, "success: Crypted %lu B in %ld.%.9ld sec\n",
-  status, end.tv_sec, end.tv_nsec);
+  fprintf(stderr, "success: Crypted %.2f MB in %.2f sec (%.2f MB/s)\n",
+    (status / (double)(1 << 20)),  duration,
+    (status / (double)(1 << 20)) / duration);
   return 0;
 }
 
