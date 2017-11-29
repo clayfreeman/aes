@@ -44,75 +44,73 @@ void  usage(int argc, char* argv[]);
 int main(int argc, char* argv[]) {
   FILE* fp = NULL;
   // Ensure that the minimum of three arguments was provided
-  if (argc > 3) {
-    errno = 0;
-    // Attempt to open the file at the path held by the first argument
-    if ((fp = fopen(argv[1], "r+b")) == NULL) {
-      perror("file: fopen()");
-      usage(argc, argv);
-      return 1;
-    } else {
-      // Determine the size of the file
-      fseek(fp, 0, SEEK_END); size = ftell(fp); fclose(fp); fp = NULL;
-      // Ensure that the provided NONCE argument is the correct length
-      if (strlen(argv[2]) != 16) {
-        fprintf(stderr, "error: nonce must be 16 hexadecimal characters\n");
-      } else {
-        errno = 0;
-        // Attempt to read the NONCE held by the second argument
-        { uint64_t tmp = htonll(strtoull(argv[2], NULL, 16));
-        memcpy(nonce.val, &tmp, 8); }
-        if (errno != 0) {
-          perror("nonce: strtoull()");
-          usage(argc, argv);
-          return 2;
-        } else {
-          // Ensure that the provided KEY argument is the correct length
-          if (strlen(argv[3]) != 32) {
-            fprintf(stderr, "error: key must be 32 hexadecimal characters\n");
-          } else {
-            errno = 0;
-            // Attempt to read the low portion of the key first
-            { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16));
-            memcpy(&key.val[8], &tmp, 8); }
-            // Replace the first byte of the low portion with a NULL character
-            argv[3][16] = 0;
-            // Finally, attempt to read the high portion of the key
-            { uint64_t tmp = htonll(strtoull(argv[3],      NULL, 16));
-            memcpy(key.val,     &tmp, 8); }
-            // Check for an error during either HIGH/LOW strtoull() operation
-            if (errno != 0) {
-              perror("key: strtoull()");
-              usage(argc, argv);
-              return 3;
-            } else {
-              // Create some state to store the status and duration of the ops
-              size_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
-              // Attempt to initialize the key and crypt the file
-              aes128_key_init(&key);
-              clock_gettime(CLOCK_MONOTONIC, &start);
-              // status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
-              status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 8);
-              clock_gettime(CLOCK_MONOTONIC, &end);
-              timespec_diff(&start, &end);
-              // Check the status of the cryption operation
-              if (status == size) {
-                fprintf(stderr, "success: Crypted %lu B in %ld.%.9ld sec\n",
-                  status, end.tv_sec, end.tv_nsec);
-                return 0;
-              } else {
-                fprintf(stderr, "error: Cryption failed\n");
-              }
-            }
-          }
-        }
-      }
-    }
-  } else {
+  if (argc < 4) {
     fprintf(stderr, "error: Not enough arguments.\n");
     usage(argc, argv);
+    return 1;
   }
-  return 127;
+  errno = 0;
+  // Attempt to open the file at the path held by the first argument
+  if ((fp = fopen(argv[1], "r+b")) == NULL) {
+    perror("file: fopen()");
+    usage(argc, argv);
+    return 2;
+  }
+  // Determine the size of the file
+  fseek(fp, 0, SEEK_END); size = ftell(fp); fclose(fp); fp = NULL;
+  // Ensure that the provided NONCE argument is the correct length
+  if (strlen(argv[2]) != 16) {
+    fprintf(stderr, "error: nonce must be 16 hexadecimal characters\n");
+    usage(argc, argv);
+    return 3;
+  }
+  errno = 0;
+  // Attempt to read the NONCE held by the second argument
+  { uint64_t tmp = htonll(strtoull(argv[2], NULL, 16));
+  memcpy(nonce.val, &tmp, 8); }
+  if (errno != 0) {
+    perror("nonce: strtoull()");
+    usage(argc, argv);
+    return 4;
+  }
+  // Ensure that the provided KEY argument is the correct length
+  if (strlen(argv[3]) != 32) {
+    fprintf(stderr, "error: key must be 32 hexadecimal characters\n");
+    usage(argc, argv);
+    return 5;
+  }
+  errno = 0;
+  // Attempt to read the low portion of the key first
+  { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16));
+  memcpy(&key.val[8], &tmp, 8); }
+  // Replace the first byte of the low portion with a NULL character
+  argv[3][16] = 0;
+  // Finally, attempt to read the high portion of the key
+  { uint64_t tmp = htonll(strtoull(argv[3],      NULL, 16));
+  memcpy(key.val,     &tmp, 8); }
+  // Check for an error during either HIGH/LOW strtoull() operation
+  if (errno != 0) {
+    perror("key: strtoull()");
+    usage(argc, argv);
+    return 6;
+  }
+  // Create some state to store the status and duration of the ops
+  size_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
+  // Attempt to initialize the key and crypt the file
+  aes128_key_init(&key);
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  // status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
+  status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 8);
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  timespec_diff(&start, &end);
+  // Check the status of the cryption operation
+  if (status != size) {
+    fprintf(stderr, "error: Cryption failed\n");
+    return 127;
+  }
+  fprintf(stderr, "success: Crypted %lu B in %ld.%.9ld sec\n",
+  status, end.tv_sec, end.tv_nsec);
+  return 0;
 }
 
 void timespec_diff(const struct timespec* start, struct timespec* end) {
