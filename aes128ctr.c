@@ -169,12 +169,15 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
         // Attempt to read a partial block into the next block
         size_t bytes = fread(&workers[i].state[workers[i].blocks], 1, 16, ifp);
         // If we read non-zero bytes, then increment the block count and length
-        if (bytes > 0) ++workers[i].blocks; workers[i].length += bytes;
-        #if DEBUG
-          pthread_mutex_lock(&io);
-          fprintf(stderr, "[MAIN] Partial data for Thread %lu: %lu\n", i, bytes);
-          pthread_mutex_unlock(&io);
-        #endif
+        if (bytes > 0) {
+          ++workers[i].blocks; workers[i].length += bytes;
+          #if DEBUG
+            pthread_mutex_lock(&io);
+            fprintf(stderr, "[MAIN] Partial data for Thread %lu: %lu @ %lu B\n",
+            i, workers[i].blocks, workers[i].length);
+            pthread_mutex_unlock(&io);
+          #endif
+        }
       }
       // Set the offset of the worker and increment the counter
       workers[i].offset = counter; counter += workers[i].blocks;

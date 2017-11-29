@@ -34,7 +34,7 @@ typedef union {
   uint32_t word;
 } aes_word_t;
 
-uint8_t aes_galois_mul2(uint8_t input);
+// uint8_t aes_galois_mul2(uint8_t input);
 
 // Round constants used for key schedule generation
 static const uint8_t aes_rcon[256] = {
