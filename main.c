@@ -18,6 +18,7 @@
  */
 
 #define _LARGEFILE64_SOURCE
+#define _POSIX_C_SOURCE 199309L
 
 #include <errno.h>
 #include <fcntl.h>
@@ -33,7 +34,7 @@
 #include "aes128.h"
 #include "aes128ctr.h"
 
-fpos_t          size;
+size_t          size;
 aes128_nonce_t  nonce;
 aes128_key_t    key;
 
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]) {
               return 3;
             } else {
               // Create some state to store the status and duration of the ops
-              fpos_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
+              size_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
               // Attempt to initialize the key and crypt the file
               aes128_key_init(&key);
               clock_gettime(CLOCK_MONOTONIC, &start);

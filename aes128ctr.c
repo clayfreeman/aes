@@ -70,7 +70,7 @@ extern size_t aes128ctr_crypt_block_file(const aes128_nonce_t* nonce,
   return fwrite(state.val, 1, bytes_read, ofp);
 }
 
-extern fpos_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
+extern size_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
     const aes128_key_t* key, const char* path) {
   // Open two files; one for read, one for write
   FILE* ifp = fopen(path, "rb"); FILE* ofp = fopen(path, "r+b");
@@ -81,12 +81,11 @@ extern fpos_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
   for (uint64_t counter = 0, result = 16; result == 16; ++counter)
     result = aes128ctr_crypt_block_file(nonce, key, ifp, ofp, counter);
   // Return the current position of the output stream
-  fpos_t size; fgetpos(ofp, &size);
-  fclose(ifp); fclose(ofp);
+  size_t size = ftell(ofp); fclose(ifp); fclose(ofp);
   return size;
 }
 
-extern fpos_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
+extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     const aes128_key_t* key, const char* path, const size_t threads) {
   // Create a pool of workers to process data
   aes128ctr_worker_t workers[threads];
@@ -148,7 +147,7 @@ extern fpos_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     pthread_join(workers[i].thread, NULL);
   }
   // Fetch the current position of the output stream and close both streams
-  fpos_t pos; fgetpos(ofp, &pos); fclose(ifp); fclose(ofp);
+  size_t pos = ftell(ofp); fclose(ifp); fclose(ofp);
   return pos;
 }
 
