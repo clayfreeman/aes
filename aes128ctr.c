@@ -128,10 +128,10 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
   setvbuf(ofp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
   // Iterate over each thread to prepare it for launch
   for (size_t i = 0; i < threads; ++i) {
-    // Ensure that the available flag is set to false
+    // Ensure that the control flags are initialized
+    workers[i].stop  = 0;
     workers[i].tid   = i;
     workers[i].vi    = workers[i].vo = 0;
-    workers[i].stop  = 0;
     // Assign the nonce and key pointers for this worker
     workers[i].nonce = nonce; workers[i].key = key;
     // Initialize the mutexes and conditions for this worker
@@ -263,7 +263,7 @@ void* aes128ctr_pthread_target(void* arg) {
       pthread_cond_wait(&worker->ci, &worker->mi);
     #if DEBUG
       pthread_mutex_lock(&io);
-      fprintf(stderr, "[Thread %lu] Stop: %d\n", worker->stop);
+      fprintf(stderr, "[Thread %lu] Stop: %d\n", worker->tid, worker->stop);
       pthread_mutex_unlock(&io);
     #endif
     if (worker->stop) pthread_exit(NULL);
