@@ -17,6 +17,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+
 #include <stdint.h>
 #include <string.h>
 
@@ -37,14 +39,44 @@ void aes128_mix_rows(const aes128_state_t* in, aes128_state_t* out);
 extern void aes128_encrypt(const aes128_key_t* key, aes128_state_t* state) {
   // Repeat for 11 rounds of the algorithm
   for (uint8_t round_num = 0; round_num < 11; ++round_num) {
+    #if DEBUG
+      fprintf(stderr, "[AES] IN   : ");
+      for (size_t i = 0; i < 16; ++i)
+        fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+      fprintf(stderr, "\n");
+    #endif
     // Substitute each byte of the state with one from the S-box
     if (round_num > 0)                   aes128_sbox_repl(state, state);
+    #if DEBUG
+      fprintf(stderr, "[AES] SBOX : ");
+      for (size_t i = 0; i < 16; ++i)
+        fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+      fprintf(stderr, "\n");
+    #endif
     // Perform a circular shift on each row of the state
     if (round_num > 0)                   aes128_shift_cols(state, state);
+    #if DEBUG
+      fprintf(stderr, "[AES] SFTCL: ");
+      for (size_t i = 0; i < 16; ++i)
+        fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+      fprintf(stderr, "\n");
+    #endif
     // Run mix_row() on each row of the state
     if (round_num > 0 && round_num < 10) aes128_mix_rows(state, state);
+    #if DEBUG
+      fprintf(stderr, "[AES] MIXRW: ");
+      for (size_t i = 0; i < 16; ++i)
+        fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+      fprintf(stderr, "\n");
+    #endif
     // XOR the round key with the state
     aes128_add_round_key(state, state, key, round_num);
+    #if DEBUG
+      fprintf(stderr, "[AES] OUT  : ");
+      for (size_t i = 0; i < 16; ++i)
+        fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+      fprintf(stderr, "\n\n");
+    #endif
   }
 }
 
@@ -80,17 +112,20 @@ void aes128_shift_col(const aes128_state_t* in, aes128_state_t* out,
     const uint8_t column, uint8_t amount) {
   amount %= 4;
   // Store the original values held in this column
-  uint8_t temp[4] = {
-    in->val[column + 0], in->val[column + 4],
-    in->val[column + 8], in->val[column + 12]
-  }; // Shift the temporary array by the desired amount
-  *(uint32_t*)temp = ((*(uint32_t*)temp) >> ((    amount) << 3)) |
-                     ((*(uint32_t*)temp) << ((4 - amount) << 3));
+  aes_word_t temp = {{0}};
+  temp.bytes[0] = in->val[column +  0];
+  temp.bytes[1] = in->val[column +  4];
+  temp.bytes[2] = in->val[column +  8];
+  temp.bytes[3] = in->val[column + 12];
+  // Shift the temporary array by the desired amount
+  if (amount > 0)
+    temp.word = (temp.word >> ((    amount) << 3)) |
+                (temp.word << ((4 - amount) << 3));
   // Assign the shifted column to the output
-  out->val[column +  0] = temp[0];
-  out->val[column +  4] = temp[1];
-  out->val[column +  8] = temp[2];
-  out->val[column + 12] = temp[3];
+  out->val[column +  0] = temp.bytes[0];
+  out->val[column +  4] = temp.bytes[1];
+  out->val[column +  8] = temp.bytes[2];
+  out->val[column + 12] = temp.bytes[3];
 }
 
 void aes128_mix_rows(const aes128_state_t* in, aes128_state_t* out) {

@@ -22,10 +22,17 @@
 
 #include <stdint.h>
 
+#define DEBUG 0
+
 #ifndef htonll
 #include <arpa/inet.h>
 #define htonll(x) ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32)
 #endif
+
+typedef union {
+  uint8_t  bytes[4];
+  uint32_t word;
+} aes_word_t;
 
 uint8_t aes_galois_mul2(uint8_t input);
 

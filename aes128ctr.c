@@ -34,7 +34,10 @@
 #define open64  open
 #endif
 
-pthread_mutex_t io = PTHREAD_MUTEX_INITIALIZER;
+#if DEBUG
+  pthread_mutex_t io = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
 void aes128ctr_get_key(const aes128_nonce_t* nonce, const aes128_key_t* key,
   uint64_t counter, aes128_state_t* state);
 void* aes128ctr_pthread_target(void* arg);
@@ -46,8 +49,24 @@ void aes128ctr_get_key(const aes128_nonce_t* nonce,
   // Copy the corresponding nonce and counter into the input
   memcpy(state->val,                      nonce->val, sizeof(nonce->val));
   memcpy(state->val + sizeof(nonce->val), &counter, sizeof(counter));
+  #if DEBUG
+    fprintf(stderr, "[AES] KEY  : ");
+    for (size_t i = 0; i < 16; ++i)
+      fprintf(stderr, "%s%02x", i > 0 ? " " : "", key->val[i]);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "[AES] STATE: ");
+    for (size_t i = 0; i < 16; ++i)
+      fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+    fprintf(stderr, "\n");
+  #endif
   // Crypt the input to generate a key stream for this block
   aes128_encrypt(key, state);
+  #if DEBUG
+    fprintf(stderr, "[AES] ENCPT: ");
+    for (size_t i = 0; i < 16; ++i)
+      fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+    fprintf(stderr, "\n\n");
+  #endif
 }
 
 extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
@@ -55,9 +74,21 @@ extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
   // Fetch the key stream for this counter
   aes128_state_t    key_stream;
   aes128ctr_get_key(nonce, key, counter, &key_stream);
+  #if DEBUG
+    fprintf(stderr, "[AES] BEFOR: ");
+    for (size_t i = 0; i < 16; ++i)
+      fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+    fprintf(stderr, "\n");
+  #endif
   // XOR the state with the key stream
   for (uint8_t i = 0; i < sizeof(state->val); ++i)
     state->val[i] ^= key_stream.val[i];
+  #if DEBUG
+    fprintf(stderr, "[AES] AFTER: ");
+    for (size_t i = 0; i < 16; ++i)
+      fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
+    fprintf(stderr, "\n\n");
+  #endif
 }
 
 extern size_t aes128ctr_crypt_block_file(const aes128_nonce_t* nonce,
@@ -85,7 +116,7 @@ extern size_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
   size_t size = ftell(ofp); fclose(ifp); fclose(ofp);
   return size;
 }
-#define DEBUG 0
+
 extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     const aes128_key_t* key, const char* path, const size_t threads) {
   // Create a pool of workers to process data
@@ -128,15 +159,22 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
         fprintf(stderr, "[MAIN] Loading data for Thread %lu ...\n", i);
         pthread_mutex_unlock(&io);
       #endif
+      size_t pos = ftell(ifp);
       // Attempt to read as many blocks for this worker as specified
       workers[i].length = (workers[i].blocks = fread(workers[i].state,
         16, AES128CTR_WORKER_BLOCK_COUNT, ifp)) << 4;
       // Check to see that the requested number of blocks could not be read
       if (workers[i].blocks < AES128CTR_WORKER_BLOCK_COUNT) {
+        fseek(ifp, pos + workers[i].length, SEEK_SET);
         // Attempt to read a partial block into the next block
         size_t bytes = fread(&workers[i].state[workers[i].blocks], 1, 16, ifp);
         // If we read non-zero bytes, then increment the block count and length
         if (bytes > 0) ++workers[i].blocks; workers[i].length += bytes;
+        #if DEBUG
+          pthread_mutex_lock(&io);
+          fprintf(stderr, "[MAIN] Partial data for Thread %lu: %lu\n", i, bytes);
+          pthread_mutex_unlock(&io);
+        #endif
       }
       // Set the offset of the worker and increment the counter
       workers[i].offset = counter; counter += workers[i].blocks;
