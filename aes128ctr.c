@@ -262,6 +262,11 @@ void* aes128ctr_pthread_target(void* arg) {
     while (!worker->stop && !worker->vi) {
       pthread_cond_wait(&worker->ci, &worker->mi);
       if (worker->stop) pthread_exit(NULL);
+      #if DEBUG
+        pthread_mutex_lock(&io);
+        fprintf(stderr, "[Thread %lu] Stop: %d\n", worker->stop);
+        pthread_mutex_unlock(&io);
+      #endif
     }
     worker->vi = 0; pthread_cond_signal(&worker->ci);
     pthread_mutex_unlock(&worker->mi);
