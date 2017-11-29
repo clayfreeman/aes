@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #ifndef htonll
 #include <arpa/inet.h>
