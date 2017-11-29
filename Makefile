@@ -14,4 +14,4 @@ main: main.o aes.o aes128.o aes128ctr.o
 	gcc -o $@ $^ -lpthread
 
 %.o: %.c
-	gcc -Ofast -c -o $@ -std=c11 -Wall -Wextra -pedantic -fPIC $^
+	gcc -Ofast -c -g -o $@ -std=c11 -Wall -Wextra -pedantic -fPIC $^
