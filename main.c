@@ -72,11 +72,13 @@ int main(int argc, char* argv[]) {
           } else {
             errno = 0;
             // Attempt to read the low portion of the key first
-            ((uint64_t*)key.val)[1] = htonll(strtoull(argv[3] + 16, NULL, 16));
+            { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16);
+            memcpy(&key.val[8], tmp, 8); }
             // Replace the first byte of the low portion with a NULL character
             argv[3][16] = 0;
             // Finally, attempt to read the high portion of the key
-            ((uint64_t*)key.val)[0] = htonll(strtoull(argv[3],      NULL, 16));
+            { uint64_t tmp = htonll(strtoull(argv[3],      NULL, 16));
+            memcpy(key.val,     tmp, 8); }
             // Check for an error during either HIGH/LOW strtoull() operation
             if (errno != 0) {
               perror("key: strtoull()");
