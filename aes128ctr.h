@@ -20,6 +20,7 @@
 #ifndef __AES128CTR_H
 #define __AES128CTR_H
 
+#include <pthread.h>
 #include <time.h>
 
 #include "aes.h"
