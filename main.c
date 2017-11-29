@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
               timespec_diff(&start, &end);
               // Check the status of the cryption operation
               if (status == size) {
-                fprintf(stderr, "success: Crypted %llu B in %ld.%.9ld sec\n",
+                fprintf(stderr, "success: Crypted %lu B in %ld.%.9ld sec\n",
                   status, end.tv_sec, end.tv_nsec);
                 return 0;
               } else {
