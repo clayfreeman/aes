@@ -17,6 +17,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +36,7 @@
 
 void aes128ctr_get_key(const aes128_nonce_t* nonce, const aes128_key_t* key,
   uint64_t counter, aes128_state_t* state);
+void* aes128ctr_pthread_target(void* arg);
 
 void aes128ctr_get_key(const aes128_nonce_t* nonce,
     const aes128_key_t* key, uint64_t counter, aes128_state_t* state) {
@@ -82,4 +84,91 @@ extern fpos_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
   fpos_t size; fgetpos(ofp, &size);
   fclose(ifp); fclose(ofp);
   return size;
+}
+
+extern fpos_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
+    const aes128_key_t* key, const char* path, const size_t threads) {
+  // Create a pool of workers to process data
+  aes128ctr_worker_t workers[threads];
+  // Open two files; one for read, one for write
+  FILE* ifp = fopen(path, "rb"); FILE* ofp = fopen(path, "r+b");
+  // Set the buffer size for the file to increase throughput
+  setvbuf(ifp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
+  setvbuf(ofp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
+  // Iterate over each thread to prepare it for launch
+  for (size_t i = 0; i < threads; ++i) {
+    // Assign the nonce and key pointers for this worker
+    workers[i].nonce = nonce; workers[i].key = key;
+    // Initialize the mutexes and conditions for this worker
+    workers[i].mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    workers[i].ready = (pthread_cond_t) PTHREAD_COND_INITIALIZER;
+    // Launch this thread by calling pthread_create()
+    pthread_create(&workers[i].thread, NULL,
+      aes128ctr_pthread_target, &workers[i]);
+  }
+  // Continue reading until sentinel, error or EOF
+  int stop = 0; uint64_t counter = 0;
+  while (!stop && !feof(ifp) && !ferror(ifp) && !ferror(ofp)) {
+    // Prepare each thread for data processing
+    for (size_t i = 0; !feof(ifp) && !ferror(ifp) && i < threads; ++i) {
+      // Attempt to read as many blocks for this worker as specified
+      workers[i].length = (workers[i].blocks = fread(workers[i].state,
+        AES128CTR_WORKER_BLOCK_COUNT, 16, ifp)) << 4;
+      // Check to see that the requested number of blocks could not be read
+      if (workers[i].blocks < AES128CTR_WORKER_BLOCK_COUNT) {
+        // Attempt to read a partial block into the next block
+        size_t bytes = fread(&workers[i].state[workers[i].blocks], 1, 16, ifp);
+        // If we read non-zero bytes, then increment the block count and length
+        if (bytes > 0) ++workers[i].blocks; workers[i].length += bytes;
+      }
+      // Set the offset of the worker and increment the counter
+      workers[i].offset = counter; counter += workers[i].blocks;
+      // Signal the thread to begin processing data (if available)
+      if (workers[i].blocks > 0) {
+        pthread_mutex_lock(&workers[i].mutex);
+        pthread_cond_signal(&workers[i].ready);
+        pthread_mutex_unlock(&workers[i].mutex);
+      }
+    }
+    // Flush each thread's data to disk after it is finished processing
+    for (size_t i = 0; !stop && !ferror(ofp) && i < threads; ++i) {
+      // Wait for this thread to finish processing data
+      pthread_mutex_lock(&workers[i].mutex);
+      pthread_cond_wait(&workers[i].ready, &workers[i].mutex);
+      // Flush this worker's data to disk
+      size_t bytes = fwrite(workers[i].state, 1, workers[i].length, ofp);
+      stop = bytes < workers[i].length;
+      // Release the mutex to allow further processing of data
+      pthread_mutex_unlock(&workers[i].mutex);
+    }
+  }
+  // Send a cancellation request to each thread and wait for it to exit
+  for (size_t i = 0; i < threads; ++i) {
+    pthread_cancel(workers[i].thread);
+    pthread_join(workers[i].thread, NULL);
+  }
+  // Fetch the current position of the output stream and close both streams
+  fpos_t pos; fgetpos(ofp, &pos); fclose(ifp); fclose(ofp);
+  return pos;
+}
+
+void* aes128ctr_pthread_target(void* arg) {
+  // Allow this thread to be cancelled at any time
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,       NULL);
+  pthread_setcancelstate(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+  // Create a pointer to this worker's information structure
+  aes128ctr_worker_t* worker = (aes128ctr_worker_t*)arg;
+  for (;;) {
+    // Wait for the signal to begin processing data
+    pthread_mutex_lock(&worker->mutex);
+    pthread_cond_wait(&worker->ready, &worker->mutex);
+    // Iterate over each block and encrypt it
+    for (size_t i = 0; i < worker->blocks; ++i)
+      aes128ctr_crypt(worker->nonce, worker->key,
+        &worker->state[i], worker->offset + i);
+    // Signal the main thread that we're done processing data
+    pthread_cond_signal(&worker->ready);
+    // Release the mutex after processing data
+    pthread_mutex_unlock(&worker->mutex);
+  } return NULL;
 }

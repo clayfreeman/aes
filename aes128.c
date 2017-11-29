@@ -104,10 +104,10 @@ void aes128_mix_row(const uint8_t* in, uint8_t* out) {
   uint8_t temp[4] = {
     in[0], in[1], in[2], in[3]
   }; // Calculate the mixed column using the pre-calculated values
-  out[0] = aes_gal2[temp[0]] ^ aes_gal3[temp[1]] ^ temp[2] ^ temp[3];
-  out[1] = temp[0] ^ aes_gal2[temp[1]] ^ aes_gal3[temp[2]] ^ temp[3];
-  out[2] = temp[0] ^ temp[1] ^ aes_gal2[temp[2]] ^ aes_gal3[temp[3]];
-  out[3] = aes_gal3[temp[0]] ^ temp[1] ^ temp[2] ^ aes_gal2[temp[3]];
+  out[0] = temp[1] ^ aes_gal2[temp[0]] ^ aes_gal2[temp[1]] ^ temp[2] ^ temp[3];
+  out[1] = temp[2] ^ temp[0] ^ aes_gal2[temp[1]] ^ aes_gal2[temp[2]] ^ temp[3];
+  out[2] = temp[3] ^ temp[0] ^ temp[1] ^ aes_gal2[temp[2]] ^ aes_gal2[temp[3]];
+  out[3] = temp[0] ^ aes_gal2[temp[0]] ^ temp[1] ^ temp[2] ^ aes_gal2[temp[3]];
 }
 
 void aes128_key_advance(const uint8_t* in, uint8_t* out,
