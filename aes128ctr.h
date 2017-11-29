@@ -33,6 +33,7 @@ typedef struct {
   pthread_t              thread;
   pthread_mutex_t        mutex;
   pthread_cond_t         ready;
+  int                    avail;
   size_t                 offset, blocks, length;
   const aes128_nonce_t*  nonce;
   const aes128_key_t*    key;
