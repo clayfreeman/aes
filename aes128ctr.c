@@ -189,7 +189,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
           pthread_mutex_unlock(&io);
         #endif
         workers[i].vi = 1; pthread_cond_signal(&workers[i].ci);
-      } else workers[i].stop = 1;
+      }
       #if DEBUG
         pthread_mutex_lock(&io);
         fprintf(stderr, "[MAIN] Done loading data (%lu blocks / %lu B) for Thread %lu ...\n",
@@ -259,15 +259,14 @@ void* aes128ctr_pthread_target(void* arg) {
       fprintf(stderr, "[Thread %lu] Waiting for data ...\n", worker->tid);
       pthread_mutex_unlock(&io);
     #endif
-    while (!worker->stop && !worker->vi) {
+    while (!worker->stop && !worker->vi)
       pthread_cond_wait(&worker->ci, &worker->mi);
-      if (worker->stop) pthread_exit(NULL);
-      #if DEBUG
-        pthread_mutex_lock(&io);
-        fprintf(stderr, "[Thread %lu] Stop: %d\n", worker->stop);
-        pthread_mutex_unlock(&io);
-      #endif
-    }
+    #if DEBUG
+      pthread_mutex_lock(&io);
+      fprintf(stderr, "[Thread %lu] Stop: %d\n", worker->stop);
+      pthread_mutex_unlock(&io);
+    #endif
+    if (worker->stop) pthread_exit(NULL);
     worker->vi = 0; pthread_cond_signal(&worker->ci);
     pthread_mutex_unlock(&worker->mi);
     // Iterate over each block and encrypt it
