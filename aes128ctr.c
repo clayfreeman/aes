@@ -34,6 +34,7 @@
 #define open64  open
 #endif
 
+pthread_mutex_t io = PTHREAD_MUTEX_INITIALIZER;
 void aes128ctr_get_key(const aes128_nonce_t* nonce, const aes128_key_t* key,
   uint64_t counter, aes128_state_t* state);
 void* aes128ctr_pthread_target(void* arg);
@@ -84,7 +85,7 @@ extern size_t aes128ctr_crypt_path(const aes128_nonce_t* nonce,
   size_t size = ftell(ofp); fclose(ifp); fclose(ofp);
   return size;
 }
-
+#define DEBUG 0
 extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     const aes128_key_t* key, const char* path, const size_t threads) {
   // Create a pool of workers to process data
@@ -92,8 +93,8 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
   // Open two files; one for read, one for write
   FILE* ifp = fopen(path, "rb"); FILE* ofp = fopen(path, "r+b");
   // Set the buffer size for the file to increase throughput
-  // setvbuf(ifp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
-  // setvbuf(ofp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
+  setvbuf(ifp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
+  setvbuf(ofp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
   // Iterate over each thread to prepare it for launch
   for (size_t i = 0; i < threads; ++i) {
     // Ensure that the available flag is set to false
@@ -112,12 +113,20 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
   }
   // Continue reading until sentinel, error or EOF
   int stop = 0; uint64_t counter = 0;
-  while (!stop && !feof(ifp) && !ferror(ifp) && !ferror(ofp)) {
-    fprintf(stderr, "[MAIN] Loop start.\n");
+  while (!feof(ifp) && !ferror(ifp) && !ferror(ofp)) {
+    #if DEBUG
+      pthread_mutex_lock(&io);
+      fprintf(stderr, "[MAIN] Loop start.\n");
+      pthread_mutex_unlock(&io);
+    #endif
     // Prepare each thread for data processing
     for (size_t i = 0; !feof(ifp) && !ferror(ifp) && i < threads; ++i) {
       pthread_mutex_lock(&workers[i].mi);
-      fprintf(stderr, "[MAIN] Loading data for Thread %lu ...\n", i);
+      #if DEBUG
+        pthread_mutex_lock(&io);
+        fprintf(stderr, "[MAIN] Loading data for Thread %lu ...\n", i);
+        pthread_mutex_unlock(&io);
+      #endif
       // Attempt to read as many blocks for this worker as specified
       workers[i].length = (workers[i].blocks = fread(workers[i].state,
         AES128CTR_WORKER_BLOCK_COUNT, 16, ifp)) << 4;
@@ -132,17 +141,30 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
       workers[i].offset = counter; counter += workers[i].blocks;
       // Signal the thread to begin processing data (if available)
       if (workers[i].blocks > 0) {
-        fprintf(stderr, "[MAIN] Signaling input for Thread %lu ...\n", i);
+        #if DEBUG
+          pthread_mutex_lock(&io);
+          fprintf(stderr, "[MAIN] Signaling input for Thread %lu ...\n", i);
+          pthread_mutex_unlock(&io);
+        #endif
         workers[i].vi = 1; pthread_cond_signal(&workers[i].ci);
       }
-      fprintf(stderr, "[MAIN] Done loading data for Thread %lu ...\n", i);
+      #if DEBUG
+        pthread_mutex_lock(&io);
+        fprintf(stderr, "[MAIN] Done loading data (%lu blocks / %lu B) for Thread %lu ...\n",
+          workers[i].blocks, workers[i].length, i);
+        pthread_mutex_unlock(&io);
+      #endif
       pthread_mutex_unlock(&workers[i].mi);
     }
     // Flush each thread's data to disk after it is finished processing
-    for (size_t i = 0; !stop && !ferror(ofp) && i < threads; ++i) {
+    for (size_t i = 0; workers[i].blocks > 0 && !ferror(ofp) && i < threads; ++i) {
       // Wait for this thread to finish processing data
       pthread_mutex_lock(&workers[i].mo);
-      fprintf(stderr, "[MAIN] Writing data for Thread %lu ...\n", i);
+      #if DEBUG
+        pthread_mutex_lock(&io);
+        fprintf(stderr, "[MAIN] Writing data for Thread %lu ...\n", i);
+        pthread_mutex_unlock(&io);
+      #endif
       while (!workers[i].vo) pthread_cond_wait(&workers[i].co, &workers[i].mo);
       workers[i].vo = 0; pthread_cond_signal(&workers[i].co);
       // Flush this worker's data to disk
@@ -151,7 +173,11 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
         stop = bytes < workers[i].length;
       }
       // Release the mutex to allow further processing of data
-      fprintf(stderr, "[MAIN] Done writing data for Thread %lu ...\n", i);
+      #if DEBUG
+        pthread_mutex_lock(&io);
+        fprintf(stderr, "[MAIN] Done writing data for Thread %lu ...\n", i);
+        pthread_mutex_unlock(&io);
+      #endif
       pthread_mutex_unlock(&workers[i].mo);
     }
   } fprintf(stderr, "[MAIN] Killing all threads ...\n");
@@ -174,7 +200,11 @@ void* aes128ctr_pthread_target(void* arg) {
   for (;;) {
     // Wait for the signal to begin processing data
     pthread_mutex_lock(&worker->mi);
-    fprintf(stderr, "[Thread %lu] Waiting for data ...\n", worker->tid);
+    #if DEBUG
+      pthread_mutex_lock(&io);
+      fprintf(stderr, "[Thread %lu] Waiting for data ...\n", worker->tid);
+      pthread_mutex_unlock(&io);
+    #endif
     while (!worker->vi) pthread_cond_wait(&worker->ci, &worker->mi);
     worker->vi = 0; pthread_cond_signal(&worker->ci);
     pthread_mutex_unlock(&worker->mi);
@@ -184,7 +214,11 @@ void* aes128ctr_pthread_target(void* arg) {
         &worker->state[i], worker->offset + i);
     // Signal the main thread that we're done processing data
     pthread_mutex_lock(&worker->mo);
-    fprintf(stderr, "[Thread %lu] Processing complete.\n", worker->tid);
+    #if DEBUG
+      pthread_mutex_lock(&io);
+      fprintf(stderr, "[Thread %lu] Processing complete.\n", worker->tid);
+      pthread_mutex_unlock(&io);
+    #endif
     worker->vo = 1; pthread_cond_signal(&worker->co);
     pthread_mutex_unlock(&worker->mo);
   } return NULL;

@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
               // Attempt to initialize the key and crypt the file
               aes128_key_init(&key);
               clock_gettime(CLOCK_MONOTONIC, &start);
-              status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 1);
+              status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 16);
               clock_gettime(CLOCK_MONOTONIC, &end);
               timespec_diff(&start, &end);
               // Check the status of the cryption operation

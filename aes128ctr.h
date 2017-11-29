@@ -26,7 +26,7 @@
 #include "aes.h"
 #include "aes128.h"
 
-#define AES128CTR_WORKER_BLOCK_COUNT 64
+#define AES128CTR_WORKER_BLOCK_COUNT 16
 
 typedef struct {
   size_t                 tid;
