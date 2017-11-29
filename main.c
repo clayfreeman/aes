@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
   aes128_key_init(&key);
   clock_gettime(CLOCK_MONOTONIC, &start);
   // status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
-  status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 16);
+  status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 8);
   clock_gettime(CLOCK_MONOTONIC, &end);
   timespec_diff(&start, &end);
   double duration = ((double)end.tv_sec + (end.tv_nsec / 1000000000.0));
