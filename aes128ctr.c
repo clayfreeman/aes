@@ -259,7 +259,7 @@ void* aes128ctr_pthread_target(void* arg) {
       fprintf(stderr, "[Thread %lu] Waiting for data ...\n", worker->tid);
       pthread_mutex_unlock(&io);
     #endif
-    while (!worker->vi) {
+    while (!worker->stop && !worker->vi) {
       pthread_cond_wait(&worker->ci, &worker->mi);
       if (worker->stop) pthread_exit(NULL);
     }
