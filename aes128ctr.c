@@ -243,6 +243,11 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     workers[i].stop = 1; pthread_cond_signal(&workers[i].ci);
     pthread_mutex_unlock(&workers[i].mi);
     pthread_join(workers[i].thread, NULL);
+    // Destroy pthread state for this worker
+    pthread_mutex_destroy(&workers[i].mi);
+    pthread_mutex_destroy(&workers[i].mo);
+    pthread_cond_destroy (&workers[i].ci);
+    pthread_cond_destroy (&workers[i].co);
   }
   // Fetch the current position of the output stream and close both streams
   size_t pos = ftell(ofp); fclose(ifp); fclose(ofp);
