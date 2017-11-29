@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
           } else {
             errno = 0;
             // Attempt to read the low portion of the key first
-            { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16);
+            { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16));
             memcpy(&key.val[8], tmp, 8); }
             // Replace the first byte of the low portion with a NULL character
             argv[3][16] = 0;
