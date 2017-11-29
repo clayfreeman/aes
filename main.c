@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
   errno = 0;
   // Attempt to read the NONCE held by the second argument
   { uint64_t tmp = htonll(strtoull(argv[2], NULL, 16));
-  memcpy(nonce.val, &tmp, 8); }
+  memcpy(nonce.val, &tmp, 8); tmp = 0; }
   if (errno != 0) {
     perror("nonce: strtoull()");
     usage(argc, argv);
@@ -82,12 +82,12 @@ int main(int argc, char* argv[]) {
   errno = 0;
   // Attempt to read the low portion of the key first
   { uint64_t tmp = htonll(strtoull(argv[3] + 16, NULL, 16));
-  memcpy(&key.val[8], &tmp, 8); }
+  memcpy(key.val + 8, &tmp, 8); tmp = 0; }
   // Replace the first byte of the low portion with a NULL character
   argv[3][16] = 0;
   // Finally, attempt to read the high portion of the key
   { uint64_t tmp = htonll(strtoull(argv[3],      NULL, 16));
-  memcpy(key.val,     &tmp, 8); }
+  memcpy(key.val,     &tmp, 8); tmp = 0; }
   // Check for an error during either HIGH/LOW strtoull() operation
   if (errno != 0) {
     perror("key: strtoull()");
@@ -103,6 +103,9 @@ int main(int argc, char* argv[]) {
   status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1], 8);
   clock_gettime(CLOCK_MONOTONIC, &end);
   timespec_diff(&start, &end);
+  // Zero-initialize the nonce and key for security
+  memset(nonce.val, 0, sizeof(nonce.val));
+  memset(  key.val, 0, sizeof(  key.val));
   // Check the status of the cryption operation
   if (status != size) {
     fprintf(stderr, "error: Cryption failed\n");
