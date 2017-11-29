@@ -189,7 +189,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
           pthread_mutex_unlock(&io);
         #endif
         workers[i].vi = 1; pthread_cond_signal(&workers[i].ci);
-      }
+      } else workers[i].stop = 1;
       #if DEBUG
         pthread_mutex_lock(&io);
         fprintf(stderr, "[MAIN] Done loading data (%lu blocks / %lu B) for Thread %lu ...\n",
