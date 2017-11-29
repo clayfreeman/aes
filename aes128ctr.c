@@ -34,10 +34,6 @@
 #define open64  open
 #endif
 
-#if DEBUG
-  pthread_mutex_t io = PTHREAD_MUTEX_INITIALIZER;
-#endif
-
 void aes128ctr_get_key(const aes128_nonce_t* nonce, const aes128_key_t* key,
   uint64_t counter, aes128_state_t* state);
 void* aes128ctr_pthread_target(void* arg);
@@ -49,7 +45,8 @@ void aes128ctr_get_key(const aes128_nonce_t* nonce,
   // Copy the corresponding nonce and counter into the input
   memcpy(state->val,                      nonce->val, sizeof(nonce->val));
   memcpy(state->val + sizeof(nonce->val), &counter, sizeof(counter));
-  #if DEBUG
+  #if (DEBUG > 1)
+    pthread_mutex_lock(&io);
     fprintf(stderr, "[AES] KEY  : ");
     for (size_t i = 0; i < 16; ++i)
       fprintf(stderr, "%s%02x", i > 0 ? " " : "", key->val[i]);
@@ -58,14 +55,17 @@ void aes128ctr_get_key(const aes128_nonce_t* nonce,
     for (size_t i = 0; i < 16; ++i)
       fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
     fprintf(stderr, "\n");
+    pthread_mutex_unlock(&io);
   #endif
   // Crypt the input to generate a key stream for this block
   aes128_encrypt(key, state);
-  #if DEBUG
+  #if (DEBUG > 1)
+    pthread_mutex_lock(&io);
     fprintf(stderr, "[AES] ENCPT: ");
     for (size_t i = 0; i < 16; ++i)
       fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
     fprintf(stderr, "\n\n");
+    pthread_mutex_unlock(&io);
   #endif
 }
 
@@ -74,20 +74,24 @@ extern void aes128ctr_crypt(const aes128_nonce_t* nonce,
   // Fetch the key stream for this counter
   aes128_state_t    key_stream;
   aes128ctr_get_key(nonce, key, counter, &key_stream);
-  #if DEBUG
+  #if (DEBUG > 1)
+    pthread_mutex_lock(&io);
     fprintf(stderr, "[AES] BEFOR: ");
     for (size_t i = 0; i < 16; ++i)
       fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
     fprintf(stderr, "\n");
+    pthread_mutex_unlock(&io);
   #endif
   // XOR the state with the key stream
   for (uint8_t i = 0; i < sizeof(state->val); ++i)
     state->val[i] ^= key_stream.val[i];
-  #if DEBUG
+  #if (DEBUG > 1)
+    pthread_mutex_lock(&io);
     fprintf(stderr, "[AES] AFTER: ");
     for (size_t i = 0; i < 16; ++i)
       fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
     fprintf(stderr, "\n\n");
+    pthread_mutex_unlock(&io);
   #endif
 }
 
@@ -200,7 +204,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
       // Wait for this thread to finish processing data
       pthread_mutex_lock(&workers[i].mo);
       // Ensure that this worker has data to be processed
-      if (workers[i].blocks > 0) {
+      if (workers[i].length > 0) {
         #if DEBUG
           pthread_mutex_lock(&io);
           fprintf(stderr, "[MAIN] Writing %lu blocks for Thread %lu ...\n",
@@ -219,6 +223,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
           pthread_mutex_unlock(&io);
         #endif
       }
+      workers[i].blocks = workers[i].length = 0;
       pthread_mutex_unlock(&workers[i].mo);
     }
     #if DEBUG

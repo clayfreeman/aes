@@ -36,46 +36,58 @@ void aes128_shift_cols(const aes128_state_t* in, aes128_state_t* out);
 void aes128_mix_row(const uint8_t* in, uint8_t* out);
 void aes128_mix_rows(const aes128_state_t* in, aes128_state_t* out);
 
+pthread_mutex_t io = PTHREAD_MUTEX_INITIALIZER;
+
 extern void aes128_encrypt(const aes128_key_t* key, aes128_state_t* state) {
   // Repeat for 11 rounds of the algorithm
   for (uint8_t round_num = 0; round_num < 11; ++round_num) {
-    #if DEBUG
+    #if (DEBUG > 1)
+      pthread_mutex_lock(&io);
       fprintf(stderr, "[AES] IN   : ");
       for (size_t i = 0; i < 16; ++i)
         fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
       fprintf(stderr, "\n");
+      pthread_mutex_unlock(&io);
     #endif
     // Substitute each byte of the state with one from the S-box
     if (round_num > 0)                   aes128_sbox_repl(state, state);
-    #if DEBUG
+    #if (DEBUG > 1)
+      pthread_mutex_lock(&io);
       fprintf(stderr, "[AES] SBOX : ");
       for (size_t i = 0; i < 16; ++i)
         fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
       fprintf(stderr, "\n");
+      pthread_mutex_unlock(&io);
     #endif
     // Perform a circular shift on each row of the state
     if (round_num > 0)                   aes128_shift_cols(state, state);
-    #if DEBUG
+    #if (DEBUG > 1)
+      pthread_mutex_lock(&io);
       fprintf(stderr, "[AES] SFTCL: ");
       for (size_t i = 0; i < 16; ++i)
         fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
       fprintf(stderr, "\n");
+      pthread_mutex_unlock(&io);
     #endif
     // Run mix_row() on each row of the state
     if (round_num > 0 && round_num < 10) aes128_mix_rows(state, state);
-    #if DEBUG
+    #if (DEBUG > 1)
+      pthread_mutex_lock(&io);
       fprintf(stderr, "[AES] MIXRW: ");
       for (size_t i = 0; i < 16; ++i)
         fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
       fprintf(stderr, "\n");
+      pthread_mutex_unlock(&io);
     #endif
     // XOR the round key with the state
     aes128_add_round_key(state, state, key, round_num);
-    #if DEBUG
+    #if (DEBUG > 1)
+      pthread_mutex_lock(&io);
       fprintf(stderr, "[AES] OUT  : ");
       for (size_t i = 0; i < 16; ++i)
         fprintf(stderr, "%s%02x", i > 0 ? " " : "", state->val[i]);
       fprintf(stderr, "\n\n");
+      pthread_mutex_unlock(&io);
     #endif
   }
 }

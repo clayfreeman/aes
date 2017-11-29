@@ -20,6 +20,7 @@
 #ifndef __AES_H
 #define __AES_H
 
+#include <pthread.h>
 #include <stdint.h>
 
 #define DEBUG 0
@@ -33,6 +34,10 @@ typedef union {
   uint8_t  bytes[4];
   uint32_t word;
 } aes_word_t;
+
+#if DEBUG
+  extern pthread_mutex_t io;
+#endif
 
 // uint8_t aes_galois_mul2(uint8_t input);
 
