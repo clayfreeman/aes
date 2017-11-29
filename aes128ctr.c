@@ -96,6 +96,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
   setvbuf(ofp, NULL, _IOFBF, threads * (AES128CTR_WORKER_BLOCK_COUNT << 4));
   // Iterate over each thread to prepare it for launch
   for (size_t i = 0; i < threads; ++i) {
+    tid = i;
     // Assign the nonce and key pointers for this worker
     workers[i].nonce = nonce; workers[i].key = key;
     // Initialize the mutexes and conditions for this worker
@@ -163,14 +164,14 @@ void* aes128ctr_pthread_target(void* arg) {
   for (;;) {
     // Wait for the signal to begin processing data
     pthread_mutex_lock(&worker->mutex);
-    fprintf(stderr, "[Thread %lu] Waiting for data ...\n", i);
+    fprintf(stderr, "[Thread %lu] Waiting for data ...\n", worker->tid);
     pthread_cond_wait(&worker->ready, &worker->mutex);
     // Iterate over each block and encrypt it
     for (size_t i = 0; i < worker->blocks; ++i)
       aes128ctr_crypt(worker->nonce, worker->key,
         &worker->state[i], worker->offset + i);
     // Signal the main thread that we're done processing data
-    fprintf(stderr, "[Thread %lu] Processing complete.\n", i);
+    fprintf(stderr, "[Thread %lu] Processing complete.\n", worker->tid);
     pthread_cond_signal(&worker->ready);
     // Release the mutex after processing data
     pthread_mutex_unlock(&worker->mutex);

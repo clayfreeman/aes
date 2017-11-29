@@ -29,6 +29,7 @@
 #define AES128CTR_WORKER_BLOCK_COUNT 64
 
 typedef struct {
+  size_t                 tid;
   pthread_t              thread;
   pthread_mutex_t        mutex;
   pthread_cond_t         ready;
