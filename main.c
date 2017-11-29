@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
       return 1;
     } else {
       // Determine the size of the file
-      fseek(fp, 0, SEEK_END); fgetpos(fp, &size); fclose(fp); fp = NULL;
+      fseek(fp, 0, SEEK_END); size = ftell(fp); fclose(fp); fp = NULL;
       // Ensure that the provided NONCE argument is the correct length
       if (strlen(argv[2]) != 16) {
         fprintf(stderr, "error: nonce must be 16 hexadecimal characters\n");
