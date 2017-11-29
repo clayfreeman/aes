@@ -110,6 +110,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
   while (!stop && !feof(ifp) && !ferror(ifp) && !ferror(ofp)) {
     // Prepare each thread for data processing
     for (size_t i = 0; !feof(ifp) && !ferror(ifp) && i < threads; ++i) {
+      pthread_mutex_lock(&workers[i].mutex);
       // Attempt to read as many blocks for this worker as specified
       workers[i].length = (workers[i].blocks = fread(workers[i].state,
         AES128CTR_WORKER_BLOCK_COUNT, 16, ifp)) << 4;
@@ -123,11 +124,8 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
       // Set the offset of the worker and increment the counter
       workers[i].offset = counter; counter += workers[i].blocks;
       // Signal the thread to begin processing data (if available)
-      if (workers[i].blocks > 0) {
-        pthread_mutex_lock(&workers[i].mutex);
-        pthread_cond_signal(&workers[i].ready);
-        pthread_mutex_unlock(&workers[i].mutex);
-      }
+      if (workers[i].blocks > 0) pthread_cond_signal(&workers[i].ready);
+      pthread_mutex_unlock(&workers[i].mutex);
     }
     // Flush each thread's data to disk after it is finished processing
     for (size_t i = 0; !stop && !ferror(ofp) && i < threads; ++i) {
