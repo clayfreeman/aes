@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "error: Cryption failed\n");
     return 127;
   }
-  fprintf(stderr, "success: Crypted %.2f MB in %.2f sec (%.2f MB/s)\n",
+  fprintf(stderr, "success: Crypted %f MB in %f sec (%f MB/s)\n",
     (status / (double)(1 << 20)),  duration,
     (status / (double)(1 << 20)) / duration);
   return 0;
