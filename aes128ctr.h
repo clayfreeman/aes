@@ -26,7 +26,9 @@
 #include "aes.h"
 #include "aes128.h"
 
-#define AES128CTR_WORKER_BLOCK_COUNT 4096
+#ifndef AES128CTR_WORKER_BLOCK_COUNT
+  #define AES128CTR_WORKER_BLOCK_COUNT 4096
+#endif
 
 typedef struct {
   volatile int           stop;
