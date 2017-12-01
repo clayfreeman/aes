@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "error: Cryption failed\n");
     return 127;
   }
-  fprintf(stderr, "success: Crypted %f MB in %f sec (%f MB/s) || %d CPS\n",
+  fprintf(stderr, "success: Crypted %f MB in %f sec (%f MB/s) || %l CPS\n",
     (status / (double)(1 << 20)),  duration,
     (status / (double)(1 << 20)) / duration,
     CLOCKS_PER_SEC);
