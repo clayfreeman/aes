@@ -42,6 +42,7 @@ aes128_key_t    key;
   #define AES128CTR_WORKER_COUNT 8
 #endif
 
+void timespec_diff(const struct timespec* start, struct timespec* end);
 void usage(int argc, char* argv[]);
 
 int main(int argc, char* argv[]) {
@@ -98,18 +99,19 @@ int main(int argc, char* argv[]) {
     return 6;
   }
   // Create some state to store the status and duration of the ops
-  size_t status = 0; clock_t start, end;
+  size_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
   // Attempt to initialize the key and crypt the file
   aes128_key_init(&key);
-  start = clock();
+  clock_gettime(CLOCK_MONOTONIC_RAW, &start);
   #if (AES128CTR_WORKER_COUNT == 1)
     status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
   #else
     status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1],
       AES128CTR_WORKER_COUNT);
   #endif
-  end = clock();
-  double duration = ((double)(end - start) / CLOCKS_PER_SEC);
+  clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+  timespec_diff(&start, &end);
+  double duration = ((double)end.tv_sec + (end.tv_nsec / 1000000000.0));
   // Zero-initialize the nonce and key for security
   memset(nonce.val, 0, sizeof(nonce.val));
   memset(  key.val, 0, sizeof(  key.val));
@@ -118,11 +120,20 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "error: Cryption failed\n");
     return 127;
   }
-  fprintf(stderr, "success: Crypted %f MB in %f sec (%f MB/s) || %ld CPS\n",
+  fprintf(stderr, "success: Crypted %f MB in %f sec (%f MB/s)\n",
     (status / (double)(1 << 20)),  duration,
-    (status / (double)(1 << 20)) / duration,
-    CLOCKS_PER_SEC);
+    (status / (double)(1 << 20)) / duration);
   return 0;
+}
+
+void timespec_diff(const struct timespec* start, struct timespec* end) {
+  if ((end->tv_nsec - start->tv_nsec) < 0) {
+    end->tv_sec  -= start->tv_sec  - 1;
+    end->tv_nsec -= start->tv_nsec + 1000000000;
+  } else {
+    end->tv_sec  -= start->tv_sec;
+    end->tv_nsec -= start->tv_nsec;
+  }
 }
 
 void usage(int argc, char* argv[]) {
