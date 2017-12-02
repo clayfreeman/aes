@@ -102,14 +102,14 @@ int main(int argc, char* argv[]) {
   size_t status = 0; struct timespec start = {0, 0}, end = {0, 0};
   // Attempt to initialize the key and crypt the file
   aes128_key_init(&key);
-  clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+  clock_gettime(CLOCK_MONOTONIC, &start);
   #if (AES128CTR_WORKER_COUNT == 1)
     status = aes128ctr_crypt_path(&nonce, &key, argv[1]);
   #else
     status = aes128ctr_crypt_path_pthread(&nonce, &key, argv[1],
       AES128CTR_WORKER_COUNT);
   #endif
-  clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+  clock_gettime(CLOCK_MONOTONIC, &end);
   timespec_diff(&start, &end);
   double duration = ((double)end.tv_sec + (end.tv_nsec / 1000000000.0));
   // Zero-initialize the nonce and key for security
