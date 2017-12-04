@@ -146,7 +146,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     pthread_create(&workers[i].thread, NULL,
       aes128ctr_pthread_target, &workers[i]);
   }
-  // Continue reading until sentinel, error or EOF
+  // Continue reading until error or EOF
   uint64_t counter = 0;
   while (!feof(ifp) && !ferror(ifp) && !ferror(ofp)) {
     #if DEBUG
@@ -237,7 +237,7 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
     fprintf(stderr, "[MAIN] Stopping all threads ...\n");
     pthread_mutex_unlock(&io);
   #endif
-  // Send a cancellation request to each thread and wait for it to exit
+  // Mark each thread to stop, then wake it up and wait for it to exit
   for (size_t i = 0; i < threads; ++i) {
     pthread_mutex_lock(&workers[i].mi);
     workers[i].stop = 1; pthread_cond_signal(&workers[i].ci);
@@ -255,9 +255,6 @@ extern size_t aes128ctr_crypt_path_pthread(const aes128_nonce_t* nonce,
 }
 
 void* aes128ctr_pthread_target(void* arg) {
-  // Allow this thread to be cancelled at any time
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,       NULL);
-  pthread_setcancelstate(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
   // Create a pointer to this worker's information structure
   aes128ctr_worker_t* worker = (aes128ctr_worker_t*)arg;
   for (;;) {

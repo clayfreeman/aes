@@ -59,7 +59,7 @@ extern void aes128_encrypt(const aes128_key_t* key, aes128_state_t* state) {
       fprintf(stderr, "\n");
       pthread_mutex_unlock(&io);
     #endif
-    // Perform a circular shift on each row of the state
+    // Perform a circular shift on each column of the state
     if (round_num > 0)                   aes128_shift_cols(state, state);
     #if (DEBUG > 1)
       pthread_mutex_lock(&io);
@@ -150,7 +150,7 @@ void aes128_mix_row(const uint8_t* in, uint8_t* out) {
   // Store the original values held in this row
   uint8_t temp[4] = {
     in[0], in[1], in[2], in[3]
-  }; // Calculate the mixed column using the pre-calculated values
+  }; // Calculate the mixed row using the pre-calculated values
   out[0] = temp[1] ^ aes_gal2[temp[0]] ^ aes_gal2[temp[1]] ^ temp[2] ^ temp[3];
   out[1] = temp[2] ^ temp[0] ^ aes_gal2[temp[1]] ^ aes_gal2[temp[2]] ^ temp[3];
   out[2] = temp[3] ^ temp[0] ^ temp[1] ^ aes_gal2[temp[2]] ^ aes_gal2[temp[3]];
